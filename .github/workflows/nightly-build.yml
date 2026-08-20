@@ -1,0 +1,114 @@
+name: Weekly Build
+
+on:
+  schedule:
+    - cron: "0 22 * * 5"
+  workflow_dispatch:
+    inputs:
+      game_version:
+        description: "Minecraft game version (e.g. 26.2)"
+        required: false
+        default: ""
+      force_build:
+        description: "Force a build even if no new commits"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GAME_VERSION: "26.2"
+
+concurrency:
+  group: "weekly"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set game version
+        run: |
+          if [ -n "${{ github.event.inputs.game_version }}" ]; then
+            echo "GAME_VERSION=${{ github.event.inputs.game_version }}" >> $GITHUB_ENV
+          fi
+
+      - name: Check for new commits
+        id: commit_check
+        run: |
+          LAST_TAG=$(git tag -l 'build-*' --sort=-creatordate | head -n 1)
+          echo "last_tag=${LAST_TAG}" >> $GITHUB_OUTPUT
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous build tag found. Building."
+            echo "has_new_commits=true" >> $GITHUB_OUTPUT
+            echo "commit_count=initial" >> $GITHUB_OUTPUT
+          else
+            COMMIT_COUNT=$(git rev-list ${LAST_TAG}..HEAD --count)
+            echo "Commits since ${LAST_TAG}: ${COMMIT_COUNT}"
+            if [ "$COMMIT_COUNT" -gt 0 ]; then
+              echo "has_new_commits=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_new_commits=false" >> $GITHUB_OUTPUT
+            fi
+            echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine version tag
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        id: version
+        run: |
+          BUILD_DATE=$(date +%m%d%Y)
+          DISPLAY_DATE=$(date +"%B %d, %Y")
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "display_date=${DISPLAY_DATE}" >> $GITHUB_OUTPUT
+          echo "tag=build-${{ env.GAME_VERSION }}-${BUILD_DATE}" >> $GITHUB_OUTPUT
+
+      - name: Set up JDK 25
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: "25"
+          distribution: "zulu"
+
+      - name: Grant execute permission for gradlew
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        run: ./gradlew build
+
+      - name: Remove sources jar
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        run: rm -f ./build/libs/*-sources.jar
+
+      - name: Rename jar
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        run: |
+          JAR=$(ls ./build/libs/*.jar | head -n 1)
+          mv "$JAR" "./build/libs/Umbra-${{ env.GAME_VERSION }}-${{ steps.version.outputs.build_date }}.jar"
+
+      - name: Create Release
+        if: steps.commit_check.outputs.has_new_commits == 'true' || github.event.inputs.force_build == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Weekly Build ${{ env.GAME_VERSION }}-${{ steps.version.outputs.build_date }}"
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
+          previous_tag: ${{ steps.commit_check.outputs.last_tag }}
+          body: |
+            **Game Version:** ${{ env.GAME_VERSION }} — runs on **Lunar Client** via its built-in Fabric support.
+            Install: version selector → 26.2 → ⚙ → Mods tab → drop the jar in.
+
+            *This is an automated weekly build. If you encounter any bugs, please open an issue or visit the Discord to file a bug report.*
+          files: |
+            ./build/libs/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

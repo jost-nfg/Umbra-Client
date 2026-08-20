@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "umbra",
+	"version": "1.0.0",
+	"name": "Umbra Client",
+	"description": "A Lunar Client 26.2 utility mod.",
+	"authors": [
+		"jost-nfg"
+	],
+	"contact": {
+		"homepage": "https://github.com/jost-nfg/Umbra-Client",
+		"sources": "https://github.com/jost-nfg/Umbra-Client",
+		"issues": "https://github.com/jost-nfg/Umbra-Client/issues"
+	},
+	"license": "GPL-3.0",
+	"icon": "assets/umbra/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"net.umbra.Umbra"
+		]
+	},
+	"mixins": [
+		"umbra.mixins.json",
+		"umbra-sodium.mixins.json"
+	],
+	"accessWidener" : "umbra.accesswidener",
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": ">=26.2-snapshot-1 <26.3",
+		"java": ">=25"
+	}
+}

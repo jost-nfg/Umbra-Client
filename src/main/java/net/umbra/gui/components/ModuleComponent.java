@@ -1,0 +1,283 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.gui.components;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Consumer;
+import net.umbra.managers.rotation.goals.EasingFunction;
+import net.umbra.settings.types.*;
+import net.umbra.Umbra;
+import net.umbra.event.events.MouseClickEvent;
+import net.umbra.gui.GuiManager;
+import net.umbra.gui.UIElement;
+import net.umbra.gui.UIProperty;
+import net.umbra.gui.colors.Colors;
+import net.umbra.gui.navigation.CloseableWindow;
+import net.umbra.gui.types.BindingMode;
+import net.umbra.gui.types.GridDefinition;
+import net.umbra.gui.types.SizeToContent;
+import net.umbra.gui.types.Thickness;
+import net.umbra.gui.types.VerticalAlignment;
+import net.umbra.gui.types.GridDefinition.RelativeUnit;
+import net.umbra.module.AntiCheat;
+import net.umbra.module.Module;
+import net.umbra.rendering.shaders.Shader;
+import net.umbra.rendering.utils.PolygonBank;
+import net.umbra.settings.Setting;
+import net.umbra.utils.input.CursorStyle;
+import net.umbra.utils.types.MouseAction;
+import net.umbra.utils.types.MouseButton;
+
+public class ModuleComponent extends Component {
+	private static final Shader DEFAULT_SHADER = Shader.solid(Colors.Transparent);
+	private static final Map<Module, CloseableWindow> openSettingsWindows = new HashMap<>();
+
+	private final StringComponent nameComponent;
+	private final RectangleComponent toggleRectangleComponent;
+	private final PolygonComponent gearComponent;
+	private final Consumer<Boolean> stateListener = this::moduleStateChanged;
+	private final Consumer<AntiCheat> antiCheatListener = _ -> updateStyling();
+
+	public static final UIProperty<Module> ModuleProperty = new UIProperty<>("Module", null, false, false, ModuleComponent::onModulePropertyChanged);
+	
+	private static void onModulePropertyChanged(UIElement sender, Module oldValue, Module newValue) {
+		if(sender instanceof ModuleComponent moduleComponent) {
+			moduleComponent.onModuleChanged(oldValue, newValue);
+			if (newValue == null) {
+				moduleComponent.setProperty(UIElement.ToolTipProperty, null);
+				moduleComponent.nameComponent.setProperty(StringComponent.TextProperty, "");
+				moduleComponent.gearComponent.setProperty(UIElement.IsVisibleProperty, false);
+				moduleComponent.updateStyling();
+				return;
+			}
+			moduleComponent.setProperty(UIElement.ToolTipProperty, newValue.getDescription());
+			moduleComponent.nameComponent.setProperty(StringComponent.TextProperty, newValue.getName());
+			moduleComponent.gearComponent.setProperty(UIElement.IsVisibleProperty, newValue.hasSettings());
+			moduleComponent.updateStyling();
+		}
+	}
+	
+	private void onModuleChanged(Module oldValue, Module newValue) {
+		if(oldValue != null)
+			oldValue.state.removeOnUpdate(stateListener);
+
+		if(newValue != null)
+			newValue.state.addOnUpdate(stateListener);
+	}
+	
+	private void moduleStateChanged(Boolean state) {
+		updateStyling();
+	}
+
+	public ModuleComponent() {
+		setProperty(UIElement.CursorProperty, CursorStyle.Click);
+		setProperty(UIElement.BorderProperty, Shader.solid(Colors.Transparent));
+		setProperty(UIElement.BorderThicknessProperty, 0f);
+		
+		toggleRectangleComponent = new RectangleComponent();
+		toggleRectangleComponent.setProperty(UIElement.PaddingProperty, new Thickness(8f, 6f));
+		toggleRectangleComponent.bindProperty(UIElement.CornerRadiusProperty, GuiManager.roundingRadius);
+		GridComponent grid = new GridComponent();
+		grid.addColumnDefinition(new GridDefinition(1f, RelativeUnit.Relative));
+		grid.addColumnDefinition(new GridDefinition(RelativeUnit.Auto));
+		grid.setProperty(UIElement.MarginProperty, null);
+		
+		nameComponent = new StringComponent();
+		nameComponent.setProperty(UIElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+		nameComponent.setProperty(UIElement.IsHitTestVisibleProperty, true);
+		nameComponent.setOnClicked(this::onModuleTextClicked);
+
+		grid.addChild(nameComponent);
+		gearComponent = new PolygonComponent(PolygonBank.GEAR);
+		gearComponent.setProperty(UIElement.WidthProperty, 16f);
+		gearComponent.setProperty(UIElement.HeightProperty, 16f);
+		gearComponent.setProperty(UIElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+		gearComponent.setOnClicked(this::onGearClicked);
+		grid.addChild(gearComponent);
+
+		toggleRectangleComponent.setContent(grid);
+		setContent(toggleRectangleComponent);
+		updateStyling();
+
+		UMBRA.moduleManager.antiCheat.addOnUpdate(antiCheatListener);
+	}
+
+	@Override
+	public void dispose() {
+		Module module = getProperty(ModuleProperty);
+		if (module != null)
+			module.state.removeOnUpdate(stateListener);
+		UMBRA.moduleManager.antiCheat.removeOnUpdate(antiCheatListener);
+		super.dispose();
+	}
+	
+	private void onModuleTextClicked(MouseClickEvent e) {
+		if (e.button == MouseButton.LEFT && e.action == MouseAction.DOWN) {
+			Module module = getProperty(ModuleComponent.ModuleProperty);
+			
+			if(module == null)
+				return;
+			
+			if (!module.isDetectable(UMBRA.moduleManager.antiCheat.getValue())) {
+				module.toggle();
+			}
+			e.cancel();
+		}
+	}
+
+	private void onGearClicked(MouseClickEvent e) {
+		if (e.button == MouseButton.LEFT && e.action == MouseAction.DOWN) {
+			Module module = getProperty(ModuleComponent.ModuleProperty);
+			if (module == null)
+				return;
+
+			CloseableWindow existing = openSettingsWindows.get(module);
+			if (existing != null) {
+				Umbra.getInstance().guiManager.removeWindow(existing, "Modules");
+				existing.dispose();
+				openSettingsWindows.remove(module);
+				e.cancel();
+				return;
+			}
+
+			float actualX = actualSize.x();
+			float actualY = actualSize.y();
+			float actualWidth = actualSize.width();
+
+			CloseableWindow settingsTab = new CloseableWindow(module.getName(), actualX + actualWidth + 1, actualY);
+			settingsTab.setProperty(UIElement.MinWidthProperty, 320.0f);
+			StackPanelComponent stackPanel = new StackPanelComponent();
+			stackPanel.setProperty(UIElement.MarginProperty, new Thickness(4f));
+			stackPanel.setSpacing(8f);
+			StringComponent titleComponent = new StringComponent(module.getName() + " Settings");
+			titleComponent.setProperty(UIElement.IsHitTestVisibleProperty, false);
+			stackPanel.addChild(titleComponent);
+
+			stackPanel.addChild(new SeparatorComponent());
+
+			for (Setting<?> setting : module.getSettings()) {
+				if (setting == module.state)
+					continue;
+
+				UIElement c;
+				if (setting instanceof FloatSetting floatSetting) {
+					SliderComponent slider = new SliderComponent();
+					slider.setProperty(SliderComponent.MinimumProperty, floatSetting.min_value);
+					slider.setProperty(SliderComponent.MaximumProperty, floatSetting.max_value);
+					slider.setProperty(SliderComponent.StepProperty, floatSetting.step);
+					slider.bindProperty(SliderComponent.ValueProperty, setting, BindingMode.TwoWay);
+					slider.setProperty(SliderComponent.HeaderProperty, setting.displayName);
+					c = slider;
+				} else if (setting instanceof RangeSetting rangeSetting) {
+					RangeComponent range = new RangeComponent();
+					range.setProperty(RangeComponent.MinimumProperty, rangeSetting.min_value);
+					range.setProperty(RangeComponent.MaximumProperty, rangeSetting.max_value);
+					range.setProperty(RangeComponent.StepProperty, rangeSetting.step);
+					range.bindProperty(RangeComponent.ValueProperty, setting, BindingMode.TwoWay);
+					range.setProperty(RangeComponent.HeaderProperty, setting.displayName);
+					c = range;
+				} else if (setting instanceof BooleanSetting) {
+					CheckboxComponent boolCheckbox = new CheckboxComponent();
+					boolCheckbox.setProperty(CheckboxComponent.HeaderProperty, setting.displayName);
+					boolCheckbox.bindProperty(CheckboxComponent.IsCheckedProperty, setting, BindingMode.TwoWay);
+					c = boolCheckbox;
+				} else if (setting instanceof ShaderSetting) {
+					ExpanderComponent shaderExpander = new ExpanderComponent(setting.displayName);
+					ShaderComponent shaderControl = new ShaderComponent();
+					shaderControl.bindProperty(ShaderComponent.ShaderProperty, setting, BindingMode.TwoWay);
+					shaderExpander.setContent(shaderControl);
+					c = shaderExpander;
+				} else if (setting instanceof ColorSetting) {
+					ColorPickerComponent colorPicker = new ColorPickerComponent();
+					colorPicker.bindProperty(ColorPickerComponent.ColorProperty, setting, BindingMode.TwoWay);
+					c = colorPicker;
+				} else if (setting instanceof BlocksSetting) {
+					ExpanderComponent blocksExpander = new ExpanderComponent(setting.displayName);
+					blocksExpander.setContent(new BlocksComponent((BlocksSetting) setting));
+					c = blocksExpander;
+				} else if (setting instanceof EntitiesSetting) {
+					ExpanderComponent entitiesExpander = new ExpanderComponent(setting.displayName);
+					entitiesExpander.setContent(new EntitiesComponent((EntitiesSetting) setting));
+					c = entitiesExpander;
+				} else if (setting instanceof EnumSetting) {
+					if (setting.getValue() instanceof EasingFunction) {
+						ExpanderComponent easingExpander = new ExpanderComponent(setting.displayName);
+						EasingComponent easingComponent = new EasingComponent();
+						easingComponent.bindProperty(EasingComponent.SelectedValueProperty, setting, BindingMode.TwoWay);
+						easingExpander.setContent(easingComponent);
+						c = easingExpander;
+					} else {
+						StackPanelComponent comboStack = new StackPanelComponent();
+
+						StringComponent enumHeader = new StringComponent();
+						enumHeader.setProperty(StringComponent.TextProperty, setting.displayName);
+						comboStack.addChild(enumHeader);
+						ComboBoxComponent comboBox = new ComboBoxComponent();
+						comboBox.setProperty(ComboBoxComponent.ItemsSourceProperty, Arrays.asList(setting.getValue().getClass().getEnumConstants()));
+						comboBox.bindProperty(ComboBoxComponent.SelectedItemProperty, setting, BindingMode.TwoWay);
+						comboStack.addChild(comboBox);
+						c = comboStack;
+					}
+				} else if (setting instanceof HotbarSetting) {
+					c = new HotbarComponent((HotbarSetting) setting);
+				} else if(setting instanceof KeybindSetting) {
+					KeybindComponent keybind = new KeybindComponent();
+					keybind.setProperty(KeybindComponent.HeaderProperty, setting.displayName);
+					keybind.bindProperty(KeybindComponent.SelectedKeyProperty, setting, BindingMode.TwoWay);
+					c = keybind;
+				} else {
+					c = null;
+				}
+
+				if (c != null) {
+					stackPanel.addChild(c);
+				}
+			}
+
+			settingsTab.setContent(stackPanel);
+
+			settingsTab.setProperty(UIElement.MinWidthProperty, 300.0f);
+			settingsTab.setProperty(UIElement.MaxWidthProperty, 600f);
+			settingsTab.setSizeToContent(SizeToContent.Height);
+			settingsTab.setOnClose(() -> openSettingsWindows.remove(module));
+			openSettingsWindows.put(module, settingsTab);
+			Umbra.getInstance().guiManager.addWindow(settingsTab, "Modules");
+			settingsTab.initialize();
+			e.cancel();
+		}
+	}
+	
+	private void updateStyling() {
+		Module module = getProperty(ModuleComponent.ModuleProperty);
+
+		if(module == null) {
+			nameComponent.setProperty(ForegroundProperty, Shader.solid(Colors.White));
+			toggleRectangleComponent.unbindProperty(UIElement.BackgroundProperty);
+			toggleRectangleComponent.setProperty(UIElement.BackgroundProperty, DEFAULT_SHADER);
+			return;
+		}
+
+		if (module.isDetectable(UMBRA.moduleManager.antiCheat.getValue())) {
+			nameComponent.setProperty(ForegroundProperty, Shader.solid(Colors.Gray));
+		} else {
+			nameComponent.setProperty(ForegroundProperty, Shader.solid(Colors.White));
+		}
+
+		// Set state rectangle color based on module state.
+		if(module.state.getValue()) {
+			toggleRectangleComponent.unbindProperty(UIElement.BackgroundProperty);
+			toggleRectangleComponent.bindProperty(UIElement.BackgroundProperty, GuiManager.buttonBackgroundColor);
+		}else {
+			toggleRectangleComponent.unbindProperty(UIElement.BackgroundProperty);
+			toggleRectangleComponent.setProperty(UIElement.BackgroundProperty, DEFAULT_SHADER);
+		}
+	}
+}

@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "package": "net.umbra.mixin.sodium",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "SodiumAbstractBlockRenderContextMixin",
+    "SodiumBlockRendererMixin",
+    "SodiumFluidRendererImplMixin",
+    "SodiumLightDataAccessMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

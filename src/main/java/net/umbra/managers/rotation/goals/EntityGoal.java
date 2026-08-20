@@ -1,0 +1,104 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.managers.rotation.goals;
+
+import java.util.Objects;
+
+import net.umbra.managers.rotation.Rotation;
+import net.umbra.managers.rotation.RotationMode;
+import net.umbra.utils.entity.BodyPart;
+import net.umbra.utils.entity.EntityUtils;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+
+public class EntityGoal extends Goal<Entity> {
+
+	private BodyPart bodyPart = BodyPart.CHEST;
+
+	@Override
+	public Rotation getGoalRotation(float tickDelta) {
+		Vec3 targetPos = EntityUtils.getBodyPartPosition(rotationGoal, bodyPart, tickDelta);
+		return Rotation.rotationFrom(targetPos, tickDelta);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (!super.equals(obj))
+			return false;
+		return this.bodyPart == ((EntityGoal) obj).bodyPart;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(rotationGoal, bodyPart);
+	}
+
+	// Builder
+	public static EntityGoal.BUILDER builder() {
+		return new EntityGoal.BUILDER();
+	}
+
+	public static class BUILDER {
+		private final EntityGoal goal;
+
+		public BUILDER() {
+			goal = new EntityGoal();
+		}
+
+		public BUILDER goal(Entity rotation) {
+			goal.rotationGoal = rotation;
+			return this;
+		}
+
+		public BUILDER mode(RotationMode mode) {
+			goal.rotationMode = mode;
+			return this;
+		}
+
+		public BUILDER maxRotation(float rotation) {
+			goal.maxRotation = rotation;
+			return this;
+		}
+
+		public BUILDER yawRandomness(float randomness) {
+			goal.yawRandomness = randomness;
+			return this;
+		}
+
+		public BUILDER pitchRandomness(float randomness) {
+			goal.pitchRandomness = randomness;
+			return this;
+		}
+
+		public BUILDER fakeRotation(boolean state) {
+			goal.fakeRotation = state;
+			return this;
+		}
+
+		public BUILDER moveFix(boolean state) {
+			goal.moveFix = state;
+			return this;
+		}
+
+		public BUILDER bodyPart(BodyPart part) {
+			goal.bodyPart = part;
+			return this;
+		}
+		
+		public BUILDER easingFunction(EasingFunction func) {
+			goal.easingFunction = func;
+			return this;
+		}
+
+		public EntityGoal build() {
+			return goal;
+		}
+	}
+
+}

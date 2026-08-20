@@ -1,0 +1,124 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.gui.navigation.windows;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import net.umbra.gui.GuiManager;
+import net.umbra.gui.UIElement;
+import net.umbra.gui.components.ButtonComponent;
+import net.umbra.gui.components.ComboBoxComponent;
+import net.umbra.gui.components.GridComponent;
+import net.umbra.gui.components.SeparatorComponent;
+import net.umbra.gui.components.StackPanelComponent;
+import net.umbra.gui.components.StringComponent;
+import net.umbra.gui.components.TextBoxComponent;
+import net.umbra.gui.font.FontManager;
+import net.umbra.gui.navigation.Window;
+import net.umbra.gui.types.GridDefinition;
+import net.umbra.gui.types.SizeToContent;
+import net.umbra.gui.types.TextAlign;
+import net.umbra.gui.types.VerticalAlignment;
+import net.umbra.gui.types.GridDefinition.RelativeUnit;
+import net.umbra.managers.SettingManager;
+
+/**
+ * Represents the Settings window that contains a list of all of the available
+ * toggle-able settings.
+ */
+public class SettingsWindow extends Window {
+	private final TextBoxComponent fileName;
+	private final ComboBoxComponent configNames;
+
+	public SettingsWindow() {
+		super("Settings", 50, 825);
+		sizeToContent = SizeToContent.Both;
+		StackPanelComponent stackPanel = new StackPanelComponent();
+		stackPanel.setSpacing(8f);
+
+		// Title Bar
+		StringComponent headerText = new StringComponent("Settings Manager");
+		headerText.setProperty(UIElement.FontWeightProperty, FontManager.WEIGHT_BOLD);
+		headerText.bindProperty(ForegroundProperty, GuiManager.foregroundHeaderColor);
+		stackPanel.addChild(headerText);
+		stackPanel.addChild(new SeparatorComponent());
+
+		stackPanel.addChild(new StringComponent("Profile:"));
+
+		GridComponent loadConfigGrid = new GridComponent();
+		loadConfigGrid.setProperty(GridComponent.HorizontalSpacingProperty, 8f);
+		loadConfigGrid.setProperty(GridComponent.VerticalSpacingProperty, 8f);
+		loadConfigGrid.addColumnDefinition(new GridDefinition(1, RelativeUnit.Relative));
+		loadConfigGrid.addColumnDefinition(new GridDefinition(100, RelativeUnit.Absolute));
+
+		configNames = new ComboBoxComponent();
+		configNames.setProperty(ComboBoxComponent.ItemsSourceProperty, SettingManager.configNames);
+		if (!SettingManager.configNames.isEmpty())
+			configNames.setProperty(ComboBoxComponent.SelectedItemProperty, SettingManager.configNames.get(0));
+		loadConfigGrid.addChild(configNames);
+
+		// Load Config Button
+		ButtonComponent btnLoadConfig = new ButtonComponent(() -> {
+			Object selectedValue = configNames.getProperty(ComboBoxComponent.SelectedItemProperty);
+			if(selectedValue instanceof String selected) {
+				if (selected != null)
+					SettingManager.setCurrentConfig(selected);
+			}
+		});
+
+		StringComponent buttonLoadString = new StringComponent("Load");
+		buttonLoadString.setProperty(StringComponent.TextAlignmentProperty, TextAlign.Center);
+		buttonLoadString.setProperty(UIElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+		btnLoadConfig.setContent(buttonLoadString);
+
+		loadConfigGrid.addChild(btnLoadConfig);
+		stackPanel.addChild(loadConfigGrid);
+
+		// Grid containing config name textbox and save button.
+		GridComponent fileSaveGrid = new GridComponent();
+		fileSaveGrid.setProperty(GridComponent.HorizontalSpacingProperty, 8f);
+		fileSaveGrid.setProperty(GridComponent.VerticalSpacingProperty, 8f);
+		fileSaveGrid.addColumnDefinition(new GridDefinition(1, RelativeUnit.Relative));
+		fileSaveGrid.addColumnDefinition(new GridDefinition(100, RelativeUnit.Absolute));
+
+		// Config Name TextBox
+		fileName = new TextBoxComponent();
+		fileSaveGrid.addChild(fileName);
+
+		// Save Button
+		ButtonComponent btnSaveACopy = new ButtonComponent(() -> {
+			String newFileName = fileName.getProperty(TextBoxComponent.TextProperty);
+			if (!newFileName.isBlank()) {
+				try {
+					SettingManager.saveCopy(newFileName);
+					SettingManager.refreshSettingFiles();
+					configNames.setProperty(ComboBoxComponent.ItemsSourceProperty, SettingManager.configNames);
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					fileName.setProperty(TextBoxComponent.TextProperty, "");
+				}
+			}
+		});
+
+		// Text inside of save button.
+		StringComponent buttonStr = new StringComponent("Save");
+		buttonStr.setProperty(StringComponent.TextAlignmentProperty, TextAlign.Center);
+		buttonStr.setProperty(UIElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+		btnSaveACopy.setContent(buttonStr);
+		fileSaveGrid.addChild(btnSaveACopy);
+		stackPanel.addChild(fileSaveGrid);
+		setContent(stackPanel);
+
+		setProperty(UIElement.MinWidthProperty, 300.0f);
+	}
+}

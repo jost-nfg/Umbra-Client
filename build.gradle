@@ -1,0 +1,107 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+    maven {
+        name = "modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+}
+
+dependencies {
+    // Minecraft and Mappings
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+    // Fabric Loader (the integration mechanism Lunar Client uses to load this mod)
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Sodium — compile-time only. Lunar Client bundles Sodium at runtime,
+    // so it must NOT be included in the jar (jar-in-jar would conflict).
+    compileOnly("maven.modrinth:sodium:${project.sodium_version}") { transitive = false }
+
+    // Library Dependencies
+    implementation("io.netty:netty-handler-proxy:${project.netty_version}") { transitive = false }
+    implementation("io.netty:netty-codec-socks:${project.netty_version}") { transitive = false }
+
+    // Test Dependencies
+	testImplementation platform('org.junit:junit-bom:5.14.3')
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testImplementation 'org.assertj:assertj-core:3.27.7'
+	testImplementation 'org.mockito:mockito-core:5.23.0'
+	testImplementation 'org.mockito:mockito-junit-jupiter:5.23.0'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
+}
+
+loom {
+	accessWidenerPath = file("src/main/resources/umbra.accesswidener")
+}
+    
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+}
+
+java {
+    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+    // if it is present.
+    // If you remove this line, sources will not be generated.
+    withSourcesJar()
+
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+    duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+}
+
+// configure the maven publication
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+
+    // See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+    repositories {
+        // Add repositories to publish to here.
+        // Notice: This block does NOT have the same function as the block in the top level.
+        // The repositories here will be used for publishing your artifact, not for
+        // retrieving dependencies.
+    }
+}

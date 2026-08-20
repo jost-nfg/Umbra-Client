@@ -1,0 +1,170 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.module.modules.world;
+
+import java.util.ArrayList;
+
+import net.umbra.Umbra;
+import net.umbra.event.events.Render3DEvent;
+import net.umbra.event.events.TickEvent.Post;
+import net.umbra.event.events.TickEvent.Pre;
+import net.umbra.event.listeners.Render3DListener;
+import net.umbra.event.listeners.TickListener;
+import net.umbra.gui.colors.Color;
+import net.umbra.module.AntiCheat;
+import net.umbra.module.Category;
+import net.umbra.module.Module;
+import net.umbra.rendering.shaders.Shader;
+import net.umbra.settings.types.ShaderSetting;
+import net.umbra.settings.types.FloatSetting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+
+public class TileBreaker extends Module implements TickListener, Render3DListener {
+	private final ArrayList<Block> blocks = new ArrayList<Block>();
+
+	private final FloatSetting radius = FloatSetting.builder().id("tilebreaker_radius").displayName("Radius")
+			.description("Radius").defaultValue(5f).minValue(0f).maxValue(15f).step(1f).build();
+
+	private final ShaderSetting color = ShaderSetting.builder().id("tilebreaker_color").displayName("Color")
+			.description("Color").defaultValue(Shader.solid(new Color(0f, 1f, 1f, 1f))).build();
+
+	public TileBreaker() {
+		super("TileBreaker");
+		setCategory(Category.of("World"));
+		setDescription("Destroys blocks that can be instantly broken around the player.");
+
+		loadTileBreakerBlocks();
+
+		addSetting(color);
+		addSetting(radius);
+
+		setDetectable(
+		    AntiCheat.NoCheatPlus,
+		    AntiCheat.Vulcan,
+		    AntiCheat.AdvancedAntiCheat,
+		    AntiCheat.Verus,
+		    AntiCheat.Grim,
+		    AntiCheat.Matrix,
+		    AntiCheat.Negativity,
+		    AntiCheat.Karhu
+		);
+	}
+
+	public void setRadius(int radius) {
+		this.radius.setValue((float) radius);
+	}
+
+	@Override
+	public void onDisable() {
+		Umbra.getInstance().eventManager.RemoveListener(Render3DListener.class, this);
+		Umbra.getInstance().eventManager.RemoveListener(TickListener.class, this);
+	}
+
+	@Override
+	public void onEnable() {
+		Umbra.getInstance().eventManager.AddListener(Render3DListener.class, this);
+		Umbra.getInstance().eventManager.AddListener(TickListener.class, this);
+	}
+
+	@Override
+	public void onToggle() {
+	}
+
+	private void loadTileBreakerBlocks() {
+		blocks.add(Blocks.TORCH);
+		blocks.add(Blocks.WALL_TORCH);
+		blocks.add(Blocks.REDSTONE_TORCH);
+		blocks.add(Blocks.REDSTONE_WALL_TORCH);
+		blocks.add(Blocks.FERN);
+		blocks.add(Blocks.LARGE_FERN);
+		blocks.add(Blocks.FLOWER_POT);
+		blocks.add(Blocks.POTATOES);
+		blocks.add(Blocks.CARROTS);
+		blocks.add(Blocks.WHEAT);
+		blocks.add(Blocks.BEETROOTS);
+		blocks.add(Blocks.SUGAR_CANE);
+		blocks.add(Blocks.GRASS_BLOCK);
+		blocks.add(Blocks.TALL_GRASS);
+		blocks.add(Blocks.SEAGRASS);
+		blocks.add(Blocks.TALL_SEAGRASS);
+		blocks.add(Blocks.DEAD_BUSH);
+		blocks.add(Blocks.DANDELION);
+		blocks.add(Blocks.ROSE_BUSH);
+		blocks.add(Blocks.POPPY);
+		blocks.add(Blocks.BLUE_ORCHID);
+		blocks.add(Blocks.ALLIUM);
+		blocks.add(Blocks.AZURE_BLUET);
+		blocks.add(Blocks.RED_TULIP);
+		blocks.add(Blocks.ORANGE_TULIP);
+		blocks.add(Blocks.WHITE_TULIP);
+		blocks.add(Blocks.PINK_TULIP);
+		blocks.add(Blocks.OXEYE_DAISY);
+		blocks.add(Blocks.CORNFLOWER);
+		blocks.add(Blocks.WITHER_ROSE);
+		blocks.add(Blocks.LILY_OF_THE_VALLEY);
+		blocks.add(Blocks.BROWN_MUSHROOM);
+		blocks.add(Blocks.RED_MUSHROOM);
+		blocks.add(Blocks.SUNFLOWER);
+		blocks.add(Blocks.LILAC);
+		blocks.add(Blocks.PEONY);
+	}
+
+	public boolean isTileBreakerBlock(Block b) {
+		return blocks.contains(b);
+	}
+
+	@Override
+	public void onRender(Render3DEvent event) {
+		int rad = radius.getValue().intValue();
+		for (int x = -rad; x < rad; x++) {
+			for (int y = rad; y > -rad; y--) {
+				for (int z = -rad; z < rad; z++) {
+					BlockPos blockpos = new BlockPos(MC.player.getBlockX() + x, MC.player.getBlockY() + y,
+							MC.player.getBlockZ() + z);
+					Block block = MC.level.getBlockState(blockpos).getBlock();
+					if (isTileBreakerBlock(block)) {
+						event.getRenderer().drawBox(new AABB(blockpos), color.getValue(),
+								1.0f);
+					}
+				}
+			}
+		}
+	}
+
+	@Override
+	public void onTick(Pre event) {
+		int rad = radius.getValue().intValue();
+		for (int x = -rad; x < rad; x++) {
+			for (int y = rad; y > -rad; y--) {
+				for (int z = -rad; z < rad; z++) {
+					BlockPos blockpos = new BlockPos(MC.player.getBlockX() + x, MC.player.getBlockY() + y,
+							MC.player.getBlockZ() + z);
+					Block block = MC.level.getBlockState(blockpos).getBlock();
+					if (isTileBreakerBlock(block)) {
+						MC.player.connection.send(
+								new ServerboundPlayerActionPacket(Action.START_DESTROY_BLOCK, blockpos, Direction.NORTH));
+						MC.player.connection.send(
+								new ServerboundPlayerActionPacket(Action.STOP_DESTROY_BLOCK, blockpos, Direction.NORTH));
+					}
+				}
+			}
+		}
+	}
+
+	@Override
+	public void onTick(Post event) {
+
+	}
+}

@@ -1,0 +1,63 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.mixin;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import net.umbra.Umbra;
+import net.umbra.UmbraClient;
+import net.umbra.module.modules.render.XRay;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+
+@Mixin(Block.class)
+public abstract class BlockMixin implements ItemLike {
+
+	@Inject(at = { @At("RETURN") }, method = {
+			"shouldRenderFace" }, cancellable = true)
+	private static void onShouldDrawSide(BlockState state, BlockState otherState, Direction side,
+										 CallbackInfoReturnable<Boolean> cir) {
+		UmbraClient umbra = Umbra.getInstance();
+		if (umbra == null || !umbra.isFullyLoaded())
+			return;
+
+		XRay xray = umbra.moduleManager.xray;
+		if (xray.state.getValue()) {
+			cir.setReturnValue(xray.isXRayBlock(state.getBlock()));
+		}
+	}
+
+	@Inject(at = { @At("HEAD") }, method = { "getSpeedFactor()F" }, cancellable = true)
+	private void onGetVelocityMultiplier(CallbackInfoReturnable<Float> cir) {
+		UmbraClient umbra = Umbra.getInstance();
+		if (umbra == null || !umbra.isFullyLoaded())
+			return;
+
+		if (!umbra.moduleManager.noslowdown.state.getValue())
+			return;
+		if (cir.getReturnValueF() < 1.0f)
+			cir.setReturnValue(1F);
+	}
+
+}

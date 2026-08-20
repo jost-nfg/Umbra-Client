@@ -1,0 +1,16 @@
+accessWidener	v2	official
+
+# BossBar packet inner classes
+accessible	class	net/minecraft/network/protocol/game/ClientboundBossEventPacket$Operation
+accessible	class	net/minecraft/network/protocol/game/ClientboundBossEventPacket$OperationType
+
+# OptionInstance inner classes for fullbright
+accessible	class	net/minecraft/client/OptionInstance$SliderableValueSet
+
+# Render pipeline registration (previously widened transitively by Fabric API, which is no longer a dependency)
+accessible	method	net/minecraft/client/renderer/RenderPipelines	register	(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+accessible	field	net/minecraft/client/renderer/RenderPipelines	GUI_TEXTURED_SNIPPET	Lcom/mojang/blaze3d/pipeline/RenderPipeline$Snippet;
+
+# GUI scissor stack access for Renderer2D
+accessible	class	net/minecraft/client/gui/GuiGraphicsExtractor$ScissorStack
+accessible	field	net/minecraft/client/gui/GuiGraphicsExtractor	scissorStack	Lnet/minecraft/client/gui/GuiGraphicsExtractor$ScissorStack;

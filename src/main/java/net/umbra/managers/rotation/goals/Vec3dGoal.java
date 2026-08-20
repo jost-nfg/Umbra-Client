@@ -1,0 +1,79 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.managers.rotation.goals;
+
+import net.umbra.managers.rotation.Rotation;
+import net.umbra.managers.rotation.RotationMode;
+import net.minecraft.world.phys.Vec3;
+
+public class Vec3dGoal extends Goal<Vec3> {
+
+	@Override
+	public Rotation getGoalRotation(float tickDelta) {
+		return Rotation.rotationFrom(rotationGoal, tickDelta);
+	}
+
+	// Builder
+	public static Vec3dGoal.BUILDER builder() {
+		return new Vec3dGoal.BUILDER();
+	}
+
+	public static class BUILDER {
+		private final Vec3dGoal goal;
+
+		public BUILDER() {
+			goal = new Vec3dGoal();
+		}
+
+		public BUILDER goal(Vec3 rotation) {
+			goal.rotationGoal = rotation;
+			return this;
+		}
+
+		public BUILDER mode(RotationMode mode) {
+			goal.rotationMode = mode;
+			return this;
+		}
+
+		public BUILDER maxRotation(float rotation) {
+			goal.maxRotation = rotation;
+			return this;
+		}
+
+		public BUILDER yawRandomness(float randomness) {
+			goal.yawRandomness = randomness;
+			return this;
+		}
+
+		public BUILDER pitchRandomness(float randomness) {
+			goal.pitchRandomness = randomness;
+			return this;
+		}
+
+		public BUILDER fakeRotation(boolean state) {
+			goal.fakeRotation = state;
+			return this;
+		}
+
+		public BUILDER moveFix(boolean state) {
+			goal.moveFix = state;
+			return this;
+		}
+		
+		public BUILDER easingFunction(EasingFunction func) {
+			goal.easingFunction = func;
+			return this;
+		}
+
+		public Vec3dGoal build() {
+			return goal;
+		}
+	}
+
+}

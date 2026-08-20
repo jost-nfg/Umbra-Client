@@ -1,0 +1,68 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.managers.macros.actions;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import net.umbra.mixin.interfaces.IKeyboardHandler;
+import net.minecraft.client.input.KeyEvent;
+
+public class KeyClickMacroEvent extends MacroEvent {
+
+	private int button = 0;
+	private int scancode = 0;
+	private int action= 0;
+	private int mods= 0;
+	
+	public KeyClickMacroEvent() {
+		
+	}
+	
+	public KeyClickMacroEvent(long timestamp, int button, int scancode, int action, int mods) {
+		super(timestamp);
+		this.button = button;
+		this.scancode = scancode;
+		this.action = action;
+		this.mods = mods;
+	}
+
+	@Override
+	public void write(DataOutputStream fs) throws IOException {
+		super.write(fs);
+		fs.writeInt(button);
+		fs.writeInt(scancode);
+		fs.writeInt(action);
+		fs.writeInt(mods);
+	}
+
+	@Override
+	public void read(DataInputStream in) throws IOException {
+		super.read(in);
+		button = in.readInt();
+		scancode = in.readInt();
+		action = in.readInt();
+		mods = in.readInt();
+	}
+
+	public int getButton() {
+		return button;
+	}
+
+	public int getAction() {
+		return action;
+	}
+
+	@Override
+	public void execute() {
+		KeyEvent keyEvent = new KeyEvent(button, scancode, mods);
+		((IKeyboardHandler) MC.keyboardHandler).invokeKeyPress(MC.getWindow().handle(), action, keyEvent);
+	}
+}

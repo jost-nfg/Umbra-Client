@@ -1,0 +1,104 @@
+package net.umbra.gui.components;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
+import net.umbra.gui.GuiManager;
+import net.umbra.gui.UIElement;
+import net.umbra.gui.colors.Color;
+import net.umbra.gui.components.StackPanelComponent.StackType;
+import net.umbra.gui.types.VerticalAlignment;
+import net.umbra.rendering.shaders.Shader;
+import net.umbra.settings.types.HotbarSetting;
+import net.umbra.utils.types.MouseAction;
+import net.umbra.utils.types.MouseButton;
+
+public class HotbarComponent extends Component {
+    private static final Color COLOR_ON = new Color(0, 154, 0, 200);
+    private static final Color COLOR_OFF = new Color(154, 0, 0, 200);
+
+    private List<Boolean> values;
+    private HotbarSetting hotbar;
+    private Consumer<List<Boolean>> onChanged;
+    private final RectangleComponent[] slotComponents;
+
+    private HotbarComponent(String text, List<Boolean> items) {
+        this.values = new ArrayList<>(items);
+    	StackPanelComponent verticalStack = new StackPanelComponent();
+        verticalStack.setSpacing(8f);
+
+        StringComponent label = new StringComponent(text);
+        label.setProperty(UIElement.IsHitTestVisibleProperty, false);
+        verticalStack.addChild(label);
+
+        StackPanelComponent slotsRow = new StackPanelComponent();
+        slotsRow.setDirection(StackType.Horizontal);
+        slotsRow.setSpacing(4f);
+
+        slotComponents = new RectangleComponent[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            final int slotIndex = i;
+            RectangleComponent slot = new RectangleComponent();
+            slot.setProperty(UIElement.BackgroundProperty, Shader.solid(values.get(i) ? COLOR_ON : COLOR_OFF));
+            slot.bindProperty(UIElement.BorderProperty, GuiManager.componentBorderColor);
+    		slot.bindProperty(UIElement.CornerRadiusProperty, GuiManager.roundingRadius);
+    		slot.setProperty(UIElement.WidthProperty, 20f);
+    		slot.setProperty(UIElement.HeightProperty, 20f);
+    		slot.setProperty(UIElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            slot.setOnClicked(e -> {
+                if (e.button == MouseButton.LEFT && e.action == MouseAction.DOWN) {
+                    toggleSlot(slotIndex);
+                    e.cancel();
+                }
+            });
+            slotComponents[slotIndex] = slot;
+            slotsRow.addChild(slot);
+        }
+
+        verticalStack.addChild(slotsRow);
+        setContent(verticalStack);
+    }
+    
+    public HotbarComponent(String text, List<Boolean> values, Consumer<List<Boolean>> onChanged) {
+    	this(text, values);
+        this.onChanged = onChanged;
+    }
+
+    private final Consumer<List<Boolean>> settingListener = this::onSettingValueChanged;
+
+    public HotbarComponent(HotbarSetting hotbar) {
+    	this(hotbar.displayName, hotbar.getValue());
+        this.hotbar = hotbar;
+        this.hotbar.addOnUpdate(settingListener);
+    }
+
+    @Override
+    public void dispose() {
+        if (hotbar != null)
+            hotbar.removeOnUpdate(settingListener);
+        super.dispose();
+    }
+
+    private void toggleSlot(int index) {
+        values.set(index, !values.get(index));
+        updateSlotColors();
+        if (hotbar != null)
+            hotbar.setValue(new ArrayList<>(values));
+        if (onChanged != null)
+            onChanged.accept(values);
+    }
+
+    private void onSettingValueChanged(List<Boolean> v) {
+        if (!v.equals(this.values)) {
+            this.values = new ArrayList<>(v);
+            updateSlotColors();
+        }
+    }
+
+    private void updateSlotColors() {
+        for (int i = 0; i < slotComponents.length; i++) {
+            slotComponents[i].setProperty(BackgroundProperty, Shader.solid(values.get(i) ? COLOR_ON : COLOR_OFF));
+        }
+    }
+}

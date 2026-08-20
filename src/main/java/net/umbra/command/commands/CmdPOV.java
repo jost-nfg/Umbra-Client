@@ -1,0 +1,79 @@
+/*
+ * Umbra Client
+ * Copyright (C) 2026 jost-nfg
+ *
+ * Licensed under the GNU General Public License, Version 3 or later.
+ * See <http://www.gnu.org/licenses/>.
+ */
+
+package net.umbra.command.commands;
+
+import java.util.List;
+
+import net.umbra.Umbra;
+import net.umbra.command.Command;
+import net.umbra.managers.CommandManager;
+import net.umbra.command.InvalidSyntaxException;
+import net.umbra.module.modules.render.POV;
+import net.minecraft.client.player.AbstractClientPlayer;
+
+public class CmdPOV extends Command {
+
+	public CmdPOV() {
+		super("pov", "Allows the player to see through someone else's POV.", "[set, toggle] [value]");
+	}
+
+	@Override
+	public void runCommand(String[] parameters) throws InvalidSyntaxException {
+		if (parameters.length != 2)
+			throw new InvalidSyntaxException(this);
+
+		POV module = Umbra.getInstance().moduleManager.pov;
+
+		switch (parameters[0]) {
+		case "set":
+			try {
+				String player = parameters[1];
+				CommandManager.sendChatMessage("Setting POV Player Name to " + player);
+				module.setEntityPOV(player);
+			} catch (Exception e) {
+				CommandManager.sendChatMessage("Invalid value.");
+			}
+			break;
+		case "toggle":
+			String state = parameters[1].toLowerCase();
+			if (state.equals("on")) {
+				module.state.setValue(true);
+				CommandManager.sendChatMessage("POV toggled ON");
+			} else if (state.equals("off")) {
+				module.state.setValue(false);
+				CommandManager.sendChatMessage("POV toggled OFF");
+			} else {
+				CommandManager.sendChatMessage("Invalid value. [ON/OFF]");
+			}
+			break;
+		default:
+			throw new InvalidSyntaxException(this);
+		}
+	}
+
+	@Override
+	public String[] getAutocorrect(String previousParameter) {
+		switch (previousParameter) {
+		case "toggle":
+			return new String[] { "on", "off" };
+		case "set":
+			List<AbstractClientPlayer> players = mc.level.players();
+			int numPlayers = players.size();
+			String[] suggestions = new String[numPlayers];
+
+			int i = 0;
+			for (AbstractClientPlayer x : players)
+				suggestions[i++] = x.getName().getString();
+
+			return suggestions;
+		default:
+			return new String[] { "toggle", "set" };
+		}
+	}
+}
