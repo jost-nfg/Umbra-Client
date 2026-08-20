@@ -44,7 +44,7 @@ public interface IMinecraft {
     void useItem();
 
     @Invoker("startAttack")
-    boolean startAttack();
+    boolean invokeStartAttack();
 
     @Mutable
     @Accessor("user")

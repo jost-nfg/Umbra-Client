@@ -88,7 +88,7 @@ public class AutoClicker extends Module implements SubtickListener {
 		timeSinceClickMs = 0f;
 		nextClickDelayMs = sampleNextClickDelay();
 
-		IMC.startAttack();
+		IMC.invokeStartAttack();
 	}
 
 	/**
